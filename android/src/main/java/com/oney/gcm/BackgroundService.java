@@ -4,17 +4,22 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.util.Log;
+import android.os.Build;
 
-import com.facebook.react.LifecycleState;
-import com.facebook.react.ReactInstanceManager;
+import io.neson.react.notification.NotificationAttributes;
+import android.os.Bundle;
+import io.neson.react.notification.Notification;
 
-import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import org.json.*;
+import android.widget.Toast;
+import android.content.Context;
 
-import io.neson.react.notification.NotificationPackage;
 
 public class BackgroundService extends Service {
     private static final String TAG = "BackgroundService";
-    private ReactInstanceManager mReactInstanceManager;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -23,53 +28,35 @@ public class BackgroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "onStartCommand");
+        Context context = getApplicationContext();
+        Bundle bundle = intent.getBundleExtra("bundle");
+        Object result = bundle.get("info");
+        String data   = result.toString();
+        String id     = bundle.get("google.message_id").toString();
+        try{
+            JSONObject jsonObj = new JSONObject(data);
+            String message = jsonObj.getString("message");
+            String subject = jsonObj.getString("subject");
+            Integer notificationId = Integer.parseInt(id.substring(0, 10).replaceAll("[\\D]", ""));
 
-        mReactInstanceManager = ReactInstanceManager.builder()
-                .setApplication(getApplication())
-                .setBundleAssetName("index.android.bundle")
-                .setJSMainModuleName("index.android")
-                .addPackage(new MainReactPackage())
-                .addPackage(new GcmPackage(intent))
-                .addPackage(new NotificationPackage(null))
-                .setUseDeveloperSupport(getBuildConfigDEBUG())
-                .setInitialLifecycleState(LifecycleState.RESUMED)
-                .build();
-        mReactInstanceManager.createReactContextInBackground();
+            NotificationAttributes attributes = new NotificationAttributes();
+            attributes.delayed = false;
+            attributes.scheduled = false;
+            attributes.autoClear = true;
+            attributes.inboxStyle = false;
+            attributes.priority = 2;
+            attributes.sound = "default";
+            attributes.smallIcon = "ic_launcher";
+            attributes.message = message;
+            attributes.subject = subject;
+            attributes.tickerText = message;
+            Notification notification = new Notification(this, notificationId, attributes);
+            notification.create();
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show();
 
+        }catch (JSONException e) {
+            Log.i(TAG,"Failed GCM"+e);
+        }  
         return START_NOT_STICKY;
-    }
-
-    @Override
-    public void onDestroy() {
-        Log.d(TAG, "onDestroy");
-        super.onDestroy();
-        mReactInstanceManager.onPause();
-        mReactInstanceManager.onDestroy();
-        mReactInstanceManager = null;
-    }
-
-    private Class getBuildConfigClass() {
-        try {
-            String packageName = getPackageName();
-
-            return Class.forName(packageName + ".BuildConfig");
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-    private boolean getBuildConfigDEBUG() {
-        Class klass = getBuildConfigClass();
-        for (Field f : klass.getDeclaredFields()) {
-            if (f.getName().equals("DEBUG")) {
-                try {
-                    return f.getBoolean(this);
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return false;
     }
 }
