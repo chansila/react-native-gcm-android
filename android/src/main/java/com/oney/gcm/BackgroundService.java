@@ -47,16 +47,17 @@ public class BackgroundService extends Service {
             attributes.priority = 2;
             attributes.sound = "default";
             attributes.smallIcon = "ic_launcher";
-            attributes.message = message;
             attributes.subject = subject;
-            attributes.tickerText = message;
+            attributes.bigText = message;
+            attributes.category= "social";
+            attributes.tickerText = subject + ": " + message;
             Notification notification = new Notification(this, notificationId, attributes);
             notification.create();
             Toast.makeText(context, message, Toast.LENGTH_LONG).show();
 
         }catch (JSONException e) {
             Log.i(TAG,"Failed GCM"+e);
-        }  
+        }
         return START_NOT_STICKY;
     }
 }
